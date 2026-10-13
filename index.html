@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Light Show Desk — build a Tesla light show</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230b0e14'/><rect x='5' y='13' width='9' height='6' rx='3' fill='%23e8f1ff'/><rect x='18' y='13' width='9' height='6' rx='3' fill='%23ffae2b'/></svg>">
+</head>
+<body>
+
+<header class="bar top">
+  <div class="brand">
+    <span class="mark"></span>
+    <span class="wordmark">Light&nbsp;Show&nbsp;Desk</span>
+    <span class="sub">Tesla · 48&nbsp;ch</span>
+  </div>
+
+  <div class="track" id="trackInfo">
+    <span class="empty">No song loaded</span>
+  </div>
+
+  <div class="actions">
+    <button class="btn" id="btnOpen">Open song</button>
+    <button class="btn" id="btnProject">Project</button>
+    <button class="btn primary" id="btnExport" disabled>Export</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel stage">
+    <h2 class="panel-title">Car <span class="hint">nose up</span></h2>
+    <div class="stage-wrap"><canvas id="stage"></canvas></div>
+    <div class="legend">
+      <span><i style="background:#e8f1ff"></i>headlamps</span>
+      <span><i style="background:#ffae2b"></i>turn &amp; markers</span>
+      <span><i style="background:#ff3b46"></i>tail &amp; brake</span>
+      <span><i style="background:#5fd3ff"></i>closures</span>
+    </div>
+    <div class="readout" id="readout">Load a song, then press Auto-build or paint the lanes yourself.</div>
+  </section>
+
+  <section class="panel editor">
+    <canvas id="timeline"></canvas>
+    <div class="dropzone" id="dropzone">
+      <div>
+        <strong>Drop an MP3 or WAV here</strong>
+        <span>44.1 kHz is what the car wants — anything else gets converted on export.</span>
+        <button class="btn primary" id="btnOpen2">Choose a file</button>
+      </div>
+    </div>
+    <div class="progress" id="progress" hidden><div class="fill" id="progressFill"></div><span id="progressLabel"></span></div>
+  </section>
+
+  <aside class="panel side">
+    <div class="card">
+      <h3>Auto-build</h3>
+      <label class="row"><span>Style</span>
+        <select id="genStyle">
+          <option value="balanced">Balanced</option>
+          <option value="party">Party</option>
+          <option value="elegant">Elegant</option>
+          <option value="classic">Classic Tesla</option>
+        </select>
+      </label>
+      <label class="row"><span>Intensity</span><input type="range" id="genIntensity" min="0" max="100" value="60"></label>
+      <label class="row check"><input type="checkbox" id="genClosures" checked><span>Move mirrors, windows, liftgate &amp; charge port</span></label>
+      <label class="row check"><input type="checkbox" id="genSelection"><span>Only inside the selected range</span></label>
+      <div class="row buttons">
+        <button class="btn primary wide" id="btnGenerate" disabled>Auto-build show</button>
+        <button class="btn icon" id="btnReroll" title="Try another take" disabled>↻</button>
+      </div>
+      <p class="note" id="genNote">Every build is a new take on the same song.</p>
+    </div>
+
+    <div class="card">
+      <h3>Tempo</h3>
+      <div class="row split">
+        <label><span>BPM</span><input type="number" id="bpm" step="0.1" min="40" max="220"></label>
+        <label><span>First beat</span><input type="number" id="beatOffset" step="0.01" min="0"></label>
+      </div>
+      <div class="row tempo-ops">
+        <button type="button" class="mini" id="btnHalf" title="Halve the detected tempo">÷2</button>
+        <button type="button" class="mini" id="btnDouble" title="Double the detected tempo">×2</button>
+        <button type="button" class="mini" id="btnNudgeBack" title="Move the grid 10 ms earlier">−10 ms</button>
+        <button type="button" class="mini" id="btnNudgeFwd" title="Move the grid 10 ms later">+10 ms</button>
+      </div>
+      <label class="row"><span>Snap</span>
+        <select id="snap">
+          <option value="bar">Bar</option>
+          <option value="beat" selected>Beat</option>
+          <option value="half">½ beat</option>
+          <option value="quarter">¼ beat</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
+      <p class="note">Watch the grid against the waveform. If the flashes feel half or twice as fast as the song, hit ÷2 or ×2, then rebuild.</p>
+    </div>
+
+    <div class="card">
+      <h3>Paint</h3>
+      <div class="chips" id="lightValues"></div>
+      <div class="chips" id="closureValues"></div>
+      <p class="note">Drag a lane to paint. Click a block to remove it. Hold Alt or use the right button to erase.</p>
+    </div>
+
+    <div class="card">
+      <h3>Patterns</h3>
+      <p class="note">Select a range on the waveform, then apply.</p>
+      <div class="chips" id="patternButtons"></div>
+      <button class="btn wide" id="btnClearRange">Clear the selected range</button>
+    </div>
+
+    <div class="card">
+      <h3>Show check</h3>
+      <div id="checks" class="checks"><span class="ok">Nothing to check yet.</span></div>
+    </div>
+  </aside>
+</main>
+
+<footer class="bar bottom">
+  <div class="transport">
+    <button class="btn icon" id="btnPlay" disabled>▶</button>
+    <button class="btn icon" id="btnStop" disabled>■</button>
+    <span class="time" id="time">0:00.00</span>
+    <span class="sep"></span>
+    <button class="btn icon" id="btnUndo" title="Undo" disabled>↶</button>
+    <button class="btn icon" id="btnRedo" title="Redo" disabled>↷</button>
+    <span class="sep"></span>
+    <button class="btn icon" id="btnZoomOut" title="Zoom out">−</button>
+    <button class="btn icon" id="btnZoomIn" title="Zoom in">+</button>
+    <button class="btn" id="btnFit">Fit</button>
+  </div>
+  <div class="status" id="status">Space plays · Z undoes · Delete clears the selection</div>
+</footer>
+
+<div class="overlay" id="exportDialog" hidden>
+  <div class="dialog">
+    <h2>Export for the car</h2>
+    <label class="row"><span>Show name</span><input type="text" id="expName" value="lightshow"></label>
+    <label class="row"><span>Frame interval</span>
+      <select id="expStep">
+        <option value="15">15 ms</option>
+        <option value="20" selected>20 ms (recommended)</option>
+        <option value="25">25 ms</option>
+        <option value="50">50 ms</option>
+      </select>
+    </label>
+    <label class="row"><span>Audio</span>
+      <select id="expAudio">
+        <option value="original">Keep the original file</option>
+        <option value="wav">Convert to 44.1 kHz WAV</option>
+      </select>
+    </label>
+    <div class="summary" id="expSummary"></div>
+    <div class="dialog-actions">
+      <button class="btn" id="btnCloseExport">Cancel</button>
+      <button class="btn" id="btnFseqOnly">.fseq only</button>
+      <button class="btn primary" id="btnZip">Download LightShow folder</button>
+    </div>
+    <p class="note">Unzip onto a USB stick formatted exFAT or FAT32 so the drive holds a top-level <code>LightShow</code> folder. Toybox → Light Show → Schedule Show.</p>
+  </div>
+</div>
+
+<div class="overlay" id="projectDialog" hidden>
+  <div class="dialog">
+    <h2>Project</h2>
+    <p class="note">A project file stores your lanes and tempo, not the audio. Open the same song again after loading one.</p>
+    <div class="dialog-actions">
+      <button class="btn" id="btnCloseProject">Close</button>
+      <button class="btn" id="btnLoadProject">Load project…</button>
+      <button class="btn primary" id="btnSaveProject">Save project</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileAudio" accept="audio/*,.mp3,.wav,.flac,.m4a" hidden>
+<input type="file" id="fileProject" accept=".json,.tlsd" hidden>
+<audio id="player" preload="auto"></audio>
+
+<script src="js/channels.js"></script>
+<script src="js/fseq.js"></script>
+<script src="js/zip.js"></script>
+<script src="js/doc.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/stage.js"></script>
+<script src="js/timeline.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
